@@ -2,15 +2,14 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # 웹페이지 기본 설정
-st.set_page_config(page_title="3D 회로 시뮬레이터", layout="wide")
+st.set_page_config(page_title="3D 입체 회로 시뮬레이터", layout="wide")
 
-# 실행할 HTML 코드 (큰따옴표 3개로 감싸기)
 html_code = """
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="utf-8">
-    <title>3D Circuit Sandbox - Vertical Expansion Edition</title>
+    <title>3D Circuit Sandbox - Physics Fix</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <style>
         body { margin: 0; overflow: hidden; background-color: #1a1a1a; font-family: 'Segoe UI', sans-serif; user-select: none; touch-action: none; }
@@ -50,7 +49,7 @@ html_code = """
     <div id="ui-layer">
         <div class="panel">
             <h1>🏢 3D 입체 회로 샌드박스</h1>
-            <p>• 전선/부품을 위로 계속 쌓을 수 있습니다.<br>• Y 높이에 따라 전선 색상이 달라집니다.<br>• [수직 도선]으로 층간 전기를 연결하세요.</p>
+            <p>• 폐회로(루프)가 완성되어야 전기가 흐릅니다.<br>• 층간 연결은 반드시 [수직 도선]을 사용하세요.</p>
             
             <div class="btn-grid" id="toolbar">
                 <button id="btn-select" onclick="setTool('select')">👆 선택/정보</button>
@@ -63,7 +62,7 @@ html_code = """
                 <button id="btn-ammeter" onclick="setTool('ammeter')">📊 전류계 (A)</button>
             </div>
             
-            <button class="action-btn" onclick="analyzeCircuit()">⚡ AI 회로 분석 & 전원 ON</button>
+            <button class="action-btn" onclick="analyzeCircuit()">⚡ 회로 분석 & 작동 테스트</button>
             <button class="action-btn reset-btn" onclick="clearAll()">전체 초기화</button>
         </div>
     </div>
@@ -79,10 +78,8 @@ html_code = """
         <div id="led-controls" class="led-setting" style="display: none;">
             <label>🎨 LED 색상</label>
             <input type="color" id="led-color" oninput="updateLEDSettings()">
-            
             <label style="margin-top:6px;">☀️ 밝기</label>
             <input type="range" id="led-brightness" min="0.2" max="5" step="0.1" value="2" oninput="updateLEDSettings()">
-            
             <label>⚡ 깜빡임 패턴</label>
             <select id="led-blink" onchange="updateLEDSettings()">
                 <option value="none">점등 (상시 켜짐)</option>
@@ -104,10 +101,7 @@ html_code = """
         let selectedBlock = null;
 
         const layerColors = [0xb87333, 0x00aaff, 0x00ffaa, 0xffaa00, 0xff0055, 0xaa00ff];
-
-        function getWireColorByY(yIndex) {
-            return layerColors[Math.min(yIndex, layerColors.length - 1)];
-        }
+        function getWireColorByY(yIndex) { return layerColors[Math.min(yIndex, layerColors.length - 1)]; }
 
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -146,7 +140,6 @@ html_code = """
 
         function createBlockMesh(type, yLayer = 0) {
             const group = new THREE.Group();
-            
             if (type === 'battery') {
                 const body = new THREE.Mesh(new THREE.BoxGeometry(1, 0.6, 1), materials.battery);
                 const pos = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.7, 0.2), materials.batteryPos);
@@ -155,11 +148,9 @@ html_code = """
             } else if (type === 'wire') {
                 const wireColor = getWireColorByY(yLayer);
                 const wireMat = new THREE.MeshPhongMaterial({ color: wireColor });
-                const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 0.2, 1), wireMat);
-                group.add(mesh);
+                group.add(new THREE.Mesh(new THREE.BoxGeometry(1, 0.2, 1), wireMat));
             } else if (type === 'vwire') {
-                const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 1, 16), materials.vwire);
-                group.add(mesh);
+                group.add(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 1, 16), materials.vwire));
             } else if (type === 'led') {
                 const base = new THREE.Mesh(new THREE.BoxGeometry(1, 0.2, 1), materials.plastic);
                 const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.4, 16, 16), materials.ledOff.clone());
@@ -207,7 +198,6 @@ html_code = """
                     } else {
                         let obj = hit.object;
                         while(obj.parent && obj.parent !== scene) obj = obj.parent;
-                        
                         pos.copy(obj.position);
                         const normal = hit.face.normal;
                         pos.x += Math.round(normal.x);
@@ -223,11 +213,7 @@ html_code = """
                         previewMesh.userData.tool = currentTool;
                         previewMesh.userData.yLayer = yLayer;
                         previewMesh.traverse(c => { 
-                            if(c.isMesh) { 
-                                c.material = c.material.clone(); 
-                                c.material.transparent = true; 
-                                c.material.opacity = 0.5; 
-                            } 
+                            if(c.isMesh) { c.material = c.material.clone(); c.material.transparent = true; c.material.opacity = 0.5; } 
                         });
                         scene.add(previewMesh);
                     }
@@ -287,7 +273,6 @@ html_code = """
                     
                     scene.remove(previewMesh);
                     previewMesh = null;
-                    
                     analyzeCircuit();
                 }
             }
@@ -298,13 +283,9 @@ html_code = """
             const p = document.getElementById('prop-panel');
             p.style.display = 'block';
             
-            let titles = { 
-                'battery': '🔋 배터리', 'wire': '〰️ 수평 전선', 'vwire': '🪜 수직 도선',
-                'led': '💡 커스텀 LED', 'voltmeter': '📟 전압계', 'ammeter': '📊 전류계' 
-            };
+            let titles = { 'battery': '🔋 배터리', 'wire': '〰️ 수평 전선', 'vwire': '🪜 수직 도선', 'led': '💡 커스텀 LED', 'voltmeter': '📟 전압계', 'ammeter': '📊 전류계' };
             document.getElementById('prop-title').innerText = titles[block.type];
             document.getElementById('prop-pos').innerText = `${block.x}, ${block.y}, ${block.z}`;
-            
             document.getElementById('prop-r').innerText = block.r + " Ω";
             document.getElementById('prop-v').innerText = block.v.toFixed(2) + " V";
             document.getElementById('prop-i').innerText = (block.i * 1000).toFixed(1) + " mA";
@@ -353,6 +334,7 @@ html_code = """
         window.analyzeCircuit = function() {
             const blockList = Object.values(blocks);
             
+            // 1. 상태 초기화
             blockList.forEach(b => {
                 b.v = 0; b.i = 0; b.p = 0; b.isLit = false;
                 if (b.type === 'led') {
@@ -362,9 +344,13 @@ html_code = """
             });
 
             const batteries = blockList.filter(b => b.type === 'battery');
-            if (batteries.length === 0) return;
+            if (batteries.length === 0) {
+                showMessage("배터리가 없습니다.", "#ff4444");
+                return;
+            }
 
-            const adj = {};
+            // 2. 인접 리스트 생성 (연결 규칙 엄격화)
+            let adj = {};
             blockList.forEach(b => adj[b.id] = []);
             
             for(let i=0; i<blockList.length; i++) {
@@ -378,10 +364,13 @@ html_code = """
                     
                     let canConnect = false;
 
+                    // 수평 연결 (상하좌우)
                     if (dy === 0 && ((dx === 1 && dz === 0) || (dx === 0 && dz === 1))) {
                         canConnect = true;
-                    } else if (dx === 0 && dz === 0 && dy === 1) {
-                        if (b1.type === 'vwire' || b2.type === 'vwire' || b1.type === 'wire' || b2.type === 'wire') {
+                    } 
+                    // 수직 연결 (층간 연결) -> **반드시 수직 도선(vwire)이 포함되어야 함**
+                    else if (dx === 0 && dz === 0 && dy === 1) {
+                        if (b1.type === 'vwire' || b2.type === 'vwire') {
                             canConnect = true;
                         }
                     }
@@ -393,20 +382,49 @@ html_code = """
                 }
             }
 
+            // 3. 막힌 길(Dead-end) 가지치기 알고리즘 -> 폐회로(루프) 판별
+            let changed = true;
+            while(changed) {
+                changed = false;
+                for(let id in adj) {
+                    let numId = parseInt(id);
+                    let block = blockList.find(b => b.id === numId);
+                    
+                    // 배터리가 아닌 부품이 한쪽만 연결되어 있으면(연결 1개 이하) 전기가 흐를 수 없음
+                    if (block.type !== 'battery' && adj[id].length <= 1) {
+                        // 이웃들의 연결 리스트에서도 나를 삭제
+                        adj[id].forEach(neighborId => {
+                            if(adj[neighborId]) {
+                                adj[neighborId] = adj[neighborId].filter(n => n !== numId);
+                            }
+                        });
+                        delete adj[id]; // 끊어진 회로에서 탈락
+                        changed = true;
+                    }
+                }
+            }
+
             let activeCount = 0;
+            
+            // 4. 폐회로(루프)에 살아남은 블록에만 전력 계산
             batteries.forEach(battery => {
+                if(!adj[battery.id] || adj[battery.id].length === 0) return; // 배터리 자체도 끊겨있으면 무시
+
+                // BFS로 배터리에서부터 연결된(살아남은) 모든 폐회로 블록 탐색
                 let visited = new Set();
                 let queue = [battery.id];
                 visited.add(battery.id);
                 
                 while(queue.length > 0) {
                     let curr = queue.shift();
-                    adj[curr].forEach(neighbor => {
-                        if(!visited.has(neighbor)) {
-                            visited.add(neighbor); 
-                            queue.push(neighbor);
-                        }
-                    });
+                    if(adj[curr]) {
+                        adj[curr].forEach(neighbor => {
+                            if(!visited.has(neighbor)) {
+                                visited.add(neighbor); 
+                                queue.push(neighbor);
+                            }
+                        });
+                    }
                 }
 
                 let pathBlocks = blockList.filter(b => visited.has(b.id));
@@ -432,7 +450,11 @@ html_code = """
                 }
             });
 
-            if(activeCount > 0) showMessage(`3D 회로 전원 공급 중! ${activeCount}개 기기 작동`, "#00ffcc");
+            if(activeCount > 0) {
+                showMessage(`정상 회로 인식 완료! ${activeCount}개 기기 켜짐`, "#00ffcc");
+            } else {
+                showMessage("회로가 끊어져 있습니다. 루프를 닫아주세요.", "#ffaa00");
+            }
 
             if(selectedBlock && blocks[`${selectedBlock.x},${selectedBlock.y},${selectedBlock.z}`]) {
                 openProperties(selectedBlock);
@@ -442,23 +464,17 @@ html_code = """
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
-            
             const time = Date.now() * 0.001;
             
             Object.values(blocks).forEach(b => {
                 if(b.type === 'led' && b.isLit) {
                     const m = b.mesh.userData.bulb.material;
                     let intensity = b.ledSettings.brightness;
-                    
-                    if (b.ledSettings.blink === 'fast') {
-                        intensity = (Math.sin(time * 15) > 0) ? b.ledSettings.brightness : 0;
-                    } else if (b.ledSettings.blink === 'slow') {
-                        intensity = (Math.sin(time * 5) > 0) ? b.ledSettings.brightness : 0;
-                    }
+                    if (b.ledSettings.blink === 'fast') intensity = (Math.sin(time * 15) > 0) ? b.ledSettings.brightness : 0;
+                    else if (b.ledSettings.blink === 'slow') intensity = (Math.sin(time * 5) > 0) ? b.ledSettings.brightness : 0;
                     m.emissiveIntensity = intensity;
                 }
             });
-
             renderer.render(scene, camera);
         }
         animate();
