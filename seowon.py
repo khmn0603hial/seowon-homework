@@ -417,12 +417,41 @@ html_code = """
                 }
             }
 
+            // --- 🔧 FIX: 막힌 길(Dead-end) 가지치기 알고리즘 ---
+            // 순환하지 않는 끊어진 도선(예: 수직 도선, 공중에 뜬 부품)을 걸러냅니다.
+            let validSet = new Set(blockList.map(b => b.id));
+            let degree = {};
+            blockList.forEach(b => degree[b.id] = adj[b.id].length);
+            
+            let leaves = [];
+            blockList.forEach(b => {
+                // 연결이 1개뿐인데 배터리가 아니면 꼬리 자르기 대상
+                if (degree[b.id] === 1 && b.type !== 'battery') leaves.push(b.id);
+                // 연결이 아예 없으면 제외
+                if (degree[b.id] === 0) validSet.delete(b.id);
+            });
+
+            while (leaves.length > 0) {
+                let leaf = leaves.shift();
+                validSet.delete(leaf);
+                adj[leaf].forEach(neighbor => {
+                    if (validSet.has(neighbor)) {
+                        degree[neighbor]--;
+                        let nBlock = blockList.find(b => b.id === neighbor);
+                        // 가지치기 후 새로운 막힌 끝이 생기면 꼬리물기 삭제
+                        if (degree[neighbor] === 1 && nBlock.type !== 'battery') {
+                            leaves.push(neighbor);
+                        }
+                    }
+                });
+            }
+            // ----------------------------------------------------
+
             let activeCount = 0;
             
             batteries.forEach(battery => {
                 if(!adj[battery.id] || adj[battery.id].length === 0) return;
 
-                // 1. 배터리의 정확한 양극/음극 맞닿은 위치 계산
                 let plusDir = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0,1,0), battery.rot * Math.PI/2);
                 let expectedPlusX = battery.x + Math.round(plusDir.x);
                 let expectedPlusZ = battery.z + Math.round(plusDir.z);
@@ -438,17 +467,20 @@ html_code = """
                     if(nBlock.x === expectedMinusX && nBlock.z === expectedMinusZ && nBlock.y === battery.y) endNode = nBlock.id;
                 });
 
-                if (!startNode || !endNode) return; // 양극과 음극 모두 연결되어 있어야 함
+                if (!startNode || !endNode) return; 
 
-                // 2. (-)극에서부터 거꾸로 탐색 (전위 맵 형성) -> 입자가 무조건 이 숫자가 작아지는 방향으로만 감!
                 let distToMinus = {};
-                let queue = [endNode];
-                distToMinus[endNode] = 0;
+                let queue = [];
+                if (validSet.has(endNode)) {
+                    distToMinus[endNode] = 0;
+                    queue.push(endNode);
+                }
                 while(queue.length > 0) {
                     let curr = queue.shift();
                     if(adj[curr]) {
                         adj[curr].forEach(neighbor => {
-                            if(neighbor !== battery.id && distToMinus[neighbor] === undefined) {
+                            // validSet(순환로) 안에 있는 부품만 탐색
+                            if(validSet.has(neighbor) && neighbor !== battery.id && distToMinus[neighbor] === undefined) {
                                 distToMinus[neighbor] = distToMinus[curr] + 1;
                                 queue.push(neighbor);
                             }
@@ -456,15 +488,17 @@ html_code = """
                     }
                 }
 
-                // 3. (+)극에서 탐색하여 유효한 닫힌 회로 판별
                 let distToPlus = {};
-                queue = [startNode];
-                distToPlus[startNode] = 0;
+                queue = [];
+                if (validSet.has(startNode)) {
+                    distToPlus[startNode] = 0;
+                    queue.push(startNode);
+                }
                 while(queue.length > 0) {
                     let curr = queue.shift();
                     if(adj[curr]) {
                         adj[curr].forEach(neighbor => {
-                            if(neighbor !== battery.id && distToPlus[neighbor] === undefined) {
+                            if(validSet.has(neighbor) && neighbor !== battery.id && distToPlus[neighbor] === undefined) {
                                 distToPlus[neighbor] = distToPlus[curr] + 1;
                                 queue.push(neighbor);
                             }
@@ -472,9 +506,8 @@ html_code = """
                     }
                 }
 
-                if (distToMinus[startNode] === undefined) return; // 회로가 끊어짐
+                if (distToMinus[startNode] === undefined) return; 
 
-                // 두 극과 모두 연결된 부품들만 활성화
                 let pathBlocks = blockList.filter(b => distToMinus[b.id] !== undefined && distToPlus[b.id] !== undefined);
                 
                 if (pathBlocks.length > 0) {
@@ -492,13 +525,12 @@ html_code = """
                             m.emissiveIntensity = b.ledSettings.brightness;
                         }
 
-                        // **중요 수정: 다음 이동할 도선을 물리적 거리 기반으로 정확히 1개만 지정**
                         let nextNode = null;
                         let minDist = distToMinus[b.id]; 
                         
                         if (adj[b.id]) {
                             adj[b.id].forEach(nId => {
-                                if (distToMinus[nId] !== undefined && distToMinus[nId] < minDist) {
+                                if (validSet.has(nId) && distToMinus[nId] !== undefined && distToMinus[nId] < minDist) {
                                     minDist = distToMinus[nId];
                                     nextNode = blockList.find(x => x.id === nId);
                                 }
@@ -508,14 +540,13 @@ html_code = """
                         if (nextNode) {
                             b.nextFlowBlock = nextNode;
                         } else if (b.id === endNode) {
-                            b.nextFlowBlock = battery; // 마지막 도착지는 배터리
+                            b.nextFlowBlock = battery; 
                         }
 
-                        // 파티클 생성 (도선당 1개)
                         let pMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
                         let pMesh = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), pMat);
                         pMesh.position.copy(b.mesh.position);
-                        pMesh.position.y += 0.25; // **중요 수정: 입자를 도선 위로 끌어올림!**
+                        pMesh.position.y += 0.25; 
                         scene.add(pMesh);
                         flowParticles.push({ mesh: pMesh, block: b, progress: (distToPlus[b.id] * 0.2) % 1 });
                     });
@@ -544,20 +575,18 @@ html_code = """
                 }
             });
 
-            // 전기 입자 이동 애니메이션 처리
             flowParticles.forEach(p => {
-                p.progress += 0.015; // 부드러운 이동 속도
+                p.progress += 0.015; 
                 if(p.progress > 1) p.progress -= 1;
                 
                 let startPos = p.block.mesh.position.clone();
-                startPos.y += 0.25; // 출발지 높이 유지
+                startPos.y += 0.25; 
                 
                 let targetPos = startPos.clone();
                 if (p.block.nextFlowBlock) {
                     targetPos = p.block.nextFlowBlock.mesh.position.clone();
-                    targetPos.y += 0.25; // 도착지 높이 유지
+                    targetPos.y += 0.25; 
                     
-                    // 배터리로 들어갈 때는 (-)극 지점에 정확히 꽂히도록 처리
                     if (p.block.nextFlowBlock.type === 'battery') {
                         let bat = p.block.nextFlowBlock;
                         let minusDir = new THREE.Vector3(-0.45, 0, 0).applyAxisAngle(new THREE.Vector3(0,1,0), bat.rot * Math.PI/2);
