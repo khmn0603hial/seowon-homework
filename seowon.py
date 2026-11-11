@@ -115,12 +115,12 @@ html_code = """
 
     <script>
         let currentTool = 'battery';
-        let currentRotation = 0; // 0, 1, 2, 3 (x90 degrees)
+        let currentRotation = 0; 
         let blocks = {}; 
         let nextBlockId = 1;
         let previewMesh = null;
         let selectedBlock = null;
-        let flowParticles = []; // 흐르는 전기 입자들
+        let flowParticles = []; 
 
         const layerColors = [0xb87333, 0x00aaff, 0x00ffaa, 0xffaa00, 0xff0055, 0xaa00ff];
         function getWireColorByY(yIndex) { return layerColors[Math.min(yIndex, layerColors.length - 1)]; }
@@ -135,12 +135,7 @@ html_code = """
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         camera.position.set(0, 10, 15);
         controls.enableDamping = true;
-        // 조작법 변경: 좌클릭 제한(Raycast용), 우클릭 회전, 휠클릭 이동
-        controls.mouseButtons = {
-            LEFT: null,
-            MIDDLE: THREE.MOUSE.PAN,
-            RIGHT: THREE.MOUSE.ROTATE
-        };
+        controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
 
         scene.add(new THREE.AmbientLight(0xffffff, 0.6));
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -157,8 +152,8 @@ html_code = """
 
         const materials = {
             batteryBody: new THREE.MeshPhongMaterial({ color: 0x333333 }),
-            batteryPlus: new THREE.MeshPhongMaterial({ color: 0xff3333 }),  // +극 (빨강)
-            batteryMinus: new THREE.MeshPhongMaterial({ color: 0x3355ff }), // -극 (파랑)
+            batteryPlus: new THREE.MeshPhongMaterial({ color: 0xff3333 }),
+            batteryMinus: new THREE.MeshPhongMaterial({ color: 0x3355ff }),
             plastic: new THREE.MeshPhongMaterial({ color: 0xcccccc }),
             vwire: new THREE.MeshPhongMaterial({ color: 0xffcc00 }),
             ledOff: new THREE.MeshStandardMaterial({ color: 0x444444, transparent: true, opacity: 0.8 }),
@@ -172,9 +167,9 @@ html_code = """
             if (type === 'battery') {
                 const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 1), materials.batteryBody);
                 const plusSide = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.6, 1), materials.batteryPlus);
-                plusSide.position.x = 0.45; // Local +X direction is (+)
+                plusSide.position.x = 0.45;
                 const minusSide = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.6, 1), materials.batteryMinus);
-                minusSide.position.x = -0.45; // Local -X direction is (-)
+                minusSide.position.x = -0.45;
                 group.add(body, plusSide, minusSide);
             } else if (type === 'wire') {
                 const wireMat = new THREE.MeshPhongMaterial({ color: getWireColorByY(yLayer) });
@@ -207,14 +202,10 @@ html_code = """
 
         window.rotatePreview = function() {
             currentRotation = (currentRotation + 1) % 4;
-            if (previewMesh) {
-                previewMesh.rotation.y = currentRotation * (Math.PI / 2);
-            }
+            if (previewMesh) previewMesh.rotation.y = currentRotation * (Math.PI / 2);
         };
 
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'r' || e.key === 'R') rotatePreview();
-        });
+        window.addEventListener('keydown', (e) => { if (e.key === 'r' || e.key === 'R') rotatePreview(); });
 
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
@@ -266,7 +257,7 @@ html_code = """
 
         renderer.domElement.addEventListener('pointerdown', (event) => {
             if (event.pointerType === 'mouse' && event.button !== 0) return;
-            if (event.clientX < 320 && event.clientY < 400) return; // UI 영역 클릭 무시
+            if (event.clientX < 320 && event.clientY < 400) return; 
             
             raycaster.setFromCamera(mouse, camera);
 
@@ -295,20 +286,19 @@ html_code = """
                     const type = currentTool;
                     const yLayer = Math.max(0, Math.round(pos.y - 0.5));
                     
-                    // 저항 설정
-                    let resistance = 0.1; // 전선
+                    let resistance = 0.1; 
                     if (type === 'led') resistance = 100;
                     if (type === 'battery') resistance = 1;
-                    if (type === 'voltmeter') resistance = 100000; // 전압계는 전류를 안 뺏어가도록 높게 설정
-                    if (type === 'ammeter') resistance = 0.01;     // 전류계는 저항이 없어야 함
+                    if (type === 'voltmeter') resistance = 100000; 
+                    if (type === 'ammeter') resistance = 0.01;     
                     
                     const block = { 
                         id: nextBlockId++, type: type, 
                         x: pos.x, y: pos.y, z: pos.z, yLayer: yLayer,
-                        rot: currentRotation, // 회전값 저장
+                        rot: currentRotation, 
                         mesh: createBlockMesh(type, yLayer),
-                        r: resistance, v: 0, i: 0, p: 0, flowOrder: -1,
-                        isLit: false,
+                        r: resistance, v: 0, i: 0, p: 0, 
+                        isLit: false, nextFlowBlock: null,
                         ledSettings: type === 'led' ? { color: '#ff0000', brightness: 2, blink: 'none' } : null
                     };
                     block.mesh.position.copy(pos);
@@ -332,7 +322,6 @@ html_code = """
             document.getElementById('prop-title').innerText = titles[block.type];
             document.getElementById('prop-pos').innerText = `${block.x}, ${block.y}, ${block.z}`;
             
-            // UI 정리: 전압계/전류계에 따라 보여지는 정보 분리
             document.getElementById('prop-group-general').style.display = 'none';
             document.getElementById('prop-group-voltmeter').style.display = 'none';
             document.getElementById('prop-group-ammeter').style.display = 'none';
@@ -391,7 +380,6 @@ html_code = """
             setTimeout(() => el.style.display = 'none', 3000);
         }
 
-        // 전기 흐름 이펙트 지우기
         function clearParticles() {
             flowParticles.forEach(p => scene.remove(p.mesh));
             flowParticles = [];
@@ -402,7 +390,7 @@ html_code = """
             clearParticles();
             
             blockList.forEach(b => {
-                b.v = 0; b.i = 0; b.p = 0; b.isLit = false; b.flowOrder = -1;
+                b.v = 0; b.i = 0; b.p = 0; b.isLit = false; b.nextFlowBlock = null;
                 if (b.type === 'led') {
                     b.mesh.userData.bulb.material.color.setHex(0x444444);
                     b.mesh.userData.bulb.material.emissive.setHex(0x000000);
@@ -417,11 +405,8 @@ html_code = """
             
             for(let i=0; i<blockList.length; i++) {
                 for(let j=i+1; j<blockList.length; j++) {
-                    const b1 = blockList[i]; 
-                    const b2 = blockList[j];
-                    const dx = Math.abs(b1.x - b2.x);
-                    const dy = Math.abs(b1.y - b2.y);
-                    const dz = Math.abs(b1.z - b2.z);
+                    const b1 = blockList[i], b2 = blockList[j];
+                    const dx = Math.abs(b1.x - b2.x), dy = Math.abs(b1.y - b2.y), dz = Math.abs(b1.z - b2.z);
                     let canConnect = false;
 
                     if (dy === 0 && ((dx === 1 && dz === 0) || (dx === 0 && dz === 1))) canConnect = true;
@@ -432,97 +417,107 @@ html_code = """
                 }
             }
 
-            // 막힌 길(Dead-end) 커팅 알고리즘
-            let changed = true;
-            while(changed) {
-                changed = false;
-                for(let id in adj) {
-                    let numId = parseInt(id);
-                    let block = blockList.find(b => b.id === numId);
-                    if (block.type !== 'battery' && adj[id].length <= 1) {
-                        adj[id].forEach(neighborId => {
-                            if(adj[neighborId]) adj[neighborId] = adj[neighborId].filter(n => n !== numId);
-                        });
-                        delete adj[id];
-                        changed = true;
-                    }
-                }
-            }
-
             let activeCount = 0;
             
             batteries.forEach(battery => {
                 if(!adj[battery.id] || adj[battery.id].length === 0) return;
 
-                // 극성 방향 및 거리 계산 (BFS from Plus to Minus)
-                // 배터리의 +극 위치 판단 (로컬 +X 방향)
+                // 1. 배터리의 정확한 양극/음극 맞닿은 위치 계산
                 let plusDir = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0,1,0), battery.rot * Math.PI/2);
-                plusDir.x = Math.round(plusDir.x);
-                plusDir.z = Math.round(plusDir.z);
-                
-                let expectedPlusX = battery.x + plusDir.x;
-                let expectedPlusZ = battery.z + plusDir.z;
+                let expectedPlusX = battery.x + Math.round(plusDir.x);
+                let expectedPlusZ = battery.z + Math.round(plusDir.z);
 
-                let startNode = null;
+                let minusDir = new THREE.Vector3(-1, 0, 0).applyAxisAngle(new THREE.Vector3(0,1,0), battery.rot * Math.PI/2);
+                let expectedMinusX = battery.x + Math.round(minusDir.x);
+                let expectedMinusZ = battery.z + Math.round(minusDir.z);
+
+                let startNode = null, endNode = null;
                 adj[battery.id].forEach(neighborId => {
                     let nBlock = blockList.find(b => b.id === neighborId);
-                    if(nBlock.x === expectedPlusX && nBlock.z === expectedPlusZ && nBlock.y === battery.y) {
-                        startNode = nBlock.id;
-                    }
+                    if(nBlock.x === expectedPlusX && nBlock.z === expectedPlusZ && nBlock.y === battery.y) startNode = nBlock.id;
+                    if(nBlock.x === expectedMinusX && nBlock.z === expectedMinusZ && nBlock.y === battery.y) endNode = nBlock.id;
                 });
 
-                // 만약 +극에 도선이 연결되지 않았다면 전기가 흐르지 않음!
-                if (!startNode) return; 
+                if (!startNode || !endNode) return; // 양극과 음극 모두 연결되어 있어야 함
 
-                // 거리 계산 (전기 입자 애니메이션을 위함)
-                let distances = {};
-                let queue = [startNode];
-                distances[startNode] = 0;
-                
+                // 2. (-)극에서부터 거꾸로 탐색 (전위 맵 형성) -> 입자가 무조건 이 숫자가 작아지는 방향으로만 감!
+                let distToMinus = {};
+                let queue = [endNode];
+                distToMinus[endNode] = 0;
                 while(queue.length > 0) {
                     let curr = queue.shift();
                     if(adj[curr]) {
                         adj[curr].forEach(neighbor => {
-                            if(neighbor !== battery.id && distances[neighbor] === undefined) {
-                                distances[neighbor] = distances[curr] + 1;
+                            if(neighbor !== battery.id && distToMinus[neighbor] === undefined) {
+                                distToMinus[neighbor] = distToMinus[curr] + 1;
                                 queue.push(neighbor);
                             }
                         });
                     }
                 }
 
-                let pathBlocks = blockList.filter(b => distances[b.id] !== undefined || b.id === battery.id);
+                // 3. (+)극에서 탐색하여 유효한 닫힌 회로 판별
+                let distToPlus = {};
+                queue = [startNode];
+                distToPlus[startNode] = 0;
+                while(queue.length > 0) {
+                    let curr = queue.shift();
+                    if(adj[curr]) {
+                        adj[curr].forEach(neighbor => {
+                            if(neighbor !== battery.id && distToPlus[neighbor] === undefined) {
+                                distToPlus[neighbor] = distToPlus[curr] + 1;
+                                queue.push(neighbor);
+                            }
+                        });
+                    }
+                }
+
+                if (distToMinus[startNode] === undefined) return; // 회로가 끊어짐
+
+                // 두 극과 모두 연결된 부품들만 활성화
+                let pathBlocks = blockList.filter(b => distToMinus[b.id] !== undefined && distToPlus[b.id] !== undefined);
                 
-                if (pathBlocks.length > 1) {
-                    let totalR = pathBlocks.reduce((sum, b) => sum + b.r, 0);
+                if (pathBlocks.length > 0) {
+                    let totalR = pathBlocks.reduce((sum, b) => sum + b.r, 0) + battery.r;
                     let circuitI = 9.0 / totalR;
 
                     pathBlocks.forEach(b => {
-                        b.i = circuitI;
-                        b.v = circuitI * b.r;
-                        b.p = Math.pow(circuitI, 2) * b.r;
+                        b.i = circuitI; b.v = circuitI * b.r; b.p = Math.pow(circuitI, 2) * b.r;
                         
-                        if (distances[b.id] !== undefined) b.flowOrder = distances[b.id];
-
                         if(b.type === 'led') {
-                            b.isLit = true;
-                            activeCount++;
+                            b.isLit = true; activeCount++;
                             const m = b.mesh.userData.bulb.material;
                             m.color.set(b.ledSettings.color);
                             m.emissive.set(b.ledSettings.color);
                             m.emissiveIntensity = b.ledSettings.brightness;
                         }
-                    });
 
-                    // 파티클 생성 (흐르는 전기)
-                    pathBlocks.forEach(b => {
-                        if (b.type !== 'battery' && b.flowOrder !== -1) {
-                            let pMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-                            let pMesh = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), pMat);
-                            pMesh.position.copy(b.mesh.position);
-                            scene.add(pMesh);
-                            flowParticles.push({ mesh: pMesh, block: b, progress: 0 });
+                        // **중요 수정: 다음 이동할 도선을 물리적 거리 기반으로 정확히 1개만 지정**
+                        let nextNode = null;
+                        let minDist = distToMinus[b.id]; 
+                        
+                        if (adj[b.id]) {
+                            adj[b.id].forEach(nId => {
+                                if (distToMinus[nId] !== undefined && distToMinus[nId] < minDist) {
+                                    minDist = distToMinus[nId];
+                                    nextNode = blockList.find(x => x.id === nId);
+                                }
+                            });
                         }
+                        
+                        if (nextNode) {
+                            b.nextFlowBlock = nextNode;
+                        } else if (b.id === endNode) {
+                            b.nextFlowBlock = battery; // 마지막 도착지는 배터리
+                        }
+
+                        // 파티클 생성 (도선당 1개)
+                        let pMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+                        let pMesh = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), pMat);
+                        pMesh.position.copy(b.mesh.position);
+                        pMesh.position.y += 0.25; // **중요 수정: 입자를 도선 위로 끌어올림!**
+                        scene.add(pMesh);
+                        flowParticles.push({ mesh: pMesh, block: b, progress: (distToPlus[b.id] * 0.2) % 1 });
                     });
                 }
             });
@@ -539,7 +534,6 @@ html_code = """
             controls.update();
             const time = Date.now() * 0.001;
             
-            // LED 깜빡임
             Object.values(blocks).forEach(b => {
                 if(b.type === 'led' && b.isLit) {
                     const m = b.mesh.userData.bulb.material;
@@ -550,21 +544,29 @@ html_code = """
                 }
             });
 
-            // 전기 입자(전자) 이동 애니메이션
-            const blockList = Object.values(blocks);
+            // 전기 입자 이동 애니메이션 처리
             flowParticles.forEach(p => {
-                p.progress += 0.02; // 이동 속도
-                if(p.progress > 1) p.progress = 0;
+                p.progress += 0.015; // 부드러운 이동 속도
+                if(p.progress > 1) p.progress -= 1;
                 
-                // 다음 연결 부품 찾기 (flowOrder가 나보다 1 큰 블록)
-                let nextBlock = blockList.find(b => b.flowOrder === p.block.flowOrder + 1);
+                let startPos = p.block.mesh.position.clone();
+                startPos.y += 0.25; // 출발지 높이 유지
                 
-                // 만약 다음 블록이 없으면(마지막 부품) 배터리(-)극으로 돌아가도록 임시 설정
-                let targetPos = nextBlock ? nextBlock.mesh.position : p.block.mesh.position;
-                
-                if (nextBlock) {
-                    p.mesh.position.lerpVectors(p.block.mesh.position, targetPos, p.progress);
+                let targetPos = startPos.clone();
+                if (p.block.nextFlowBlock) {
+                    targetPos = p.block.nextFlowBlock.mesh.position.clone();
+                    targetPos.y += 0.25; // 도착지 높이 유지
+                    
+                    // 배터리로 들어갈 때는 (-)극 지점에 정확히 꽂히도록 처리
+                    if (p.block.nextFlowBlock.type === 'battery') {
+                        let bat = p.block.nextFlowBlock;
+                        let minusDir = new THREE.Vector3(-0.45, 0, 0).applyAxisAngle(new THREE.Vector3(0,1,0), bat.rot * Math.PI/2);
+                        targetPos.x += minusDir.x;
+                        targetPos.z += minusDir.z;
+                    }
                 }
+                
+                p.mesh.position.lerpVectors(startPos, targetPos, p.progress);
             });
 
             renderer.render(scene, camera);
