@@ -1,5 +1,11 @@
-# seowon-homework
-homework
+import streamlit as st
+import streamlit.components.v1 as components
+
+# 웹페이지 기본 설정
+st.set_page_config(page_title="3D 회로 시뮬레이터", layout="wide")
+
+# 실행할 HTML 코드 (큰따옴표 3개로 감싸기)
+html_code = """
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -62,7 +68,6 @@ homework
         </div>
     </div>
 
-    <!-- 측정치 / 정보 속성 창 -->
     <div id="prop-panel">
         <h3 id="prop-title">부품 정보</h3>
         <div class="stat-row"><span>위치 (X, Y, Z):</span> <span id="prop-pos" class="stat-val">0, 0, 0</span></div>
@@ -98,15 +103,7 @@ homework
         let previewMesh = null;
         let selectedBlock = null;
 
-        // 층(Y 높이)별 전선 기본 색상 팔레트
-        const layerColors = [
-            0xb87333, // 1층: 구리 주황색
-            0x00aaff, // 2층: 파란색
-            0x00ffaa, // 3층: 민트색
-            0xffaa00, // 4층: 노란색
-            0xff0055, // 5층: 핑크색
-            0xaa00ff  // 6층 이상: 보라색
-        ];
+        const layerColors = [0xb87333, 0x00aaff, 0x00ffaa, 0xffaa00, 0xff0055, 0xaa00ff];
 
         function getWireColorByY(yIndex) {
             return layerColors[Math.min(yIndex, layerColors.length - 1)];
@@ -140,7 +137,7 @@ homework
             battery: new THREE.MeshPhongMaterial({ color: 0x222222 }),
             batteryPos: new THREE.MeshBasicMaterial({ color: 0xff0000 }),
             plastic: new THREE.MeshPhongMaterial({ color: 0xcccccc }),
-            vwire: new THREE.MeshPhongMaterial({ color: 0xffcc00 }), // 수직 도선 색상
+            vwire: new THREE.MeshPhongMaterial({ color: 0xffcc00 }),
             ledOff: new THREE.MeshStandardMaterial({ color: 0x444444, transparent: true, opacity: 0.8 }),
             voltmeter: new THREE.MeshPhongMaterial({ color: 0x115599 }),
             ammeter: new THREE.MeshPhongMaterial({ color: 0x995511 }),
@@ -161,7 +158,6 @@ homework
                 const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 0.2, 1), wireMat);
                 group.add(mesh);
             } else if (type === 'vwire') {
-                // 층간 수직 연결용 기둥형 도선
                 const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 1, 16), materials.vwire);
                 group.add(mesh);
             } else if (type === 'led') {
@@ -171,14 +167,10 @@ homework
                 group.add(base, bulb);
                 group.userData.bulb = bulb;
             } else if (type === 'voltmeter' || type === 'ammeter') {
-                // 전압계 / 전류계 본체
                 const bodyMat = (type === 'voltmeter') ? materials.voltmeter : materials.ammeter;
                 const body = new THREE.Mesh(new THREE.BoxGeometry(1, 0.6, 1), bodyMat);
-                
-                // 디스플레이 화면
                 const screen = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.4), materials.screen);
                 screen.position.set(0, 0.31, 0);
-                
                 group.add(body, screen);
             }
             return group;
@@ -195,15 +187,12 @@ homework
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
-        // 수직 확장을 위한 마우스 오버(Hover) 검사 logic
         renderer.domElement.addEventListener('pointermove', (event) => {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
             
             if (['battery', 'wire', 'vwire', 'led', 'voltmeter', 'ammeter'].includes(currentTool)) {
                 raycaster.setFromCamera(mouse, camera);
-                
-                // 바닥판 및 이미 설치된 모든 블록들을 상호작용 대상으로 지정
                 const targets = [floorMesh, ...Object.values(blocks).map(b => b.mesh)];
                 const intersects = raycaster.intersectObjects(targets, true);
                 
@@ -212,18 +201,15 @@ homework
                     let pos = new THREE.Vector3();
                     
                     if (hit.object === floorMesh) {
-                        // 1층 바닥 설치
                         pos.x = Math.floor(hit.point.x) + 0.5;
                         pos.y = 0.5;
                         pos.z = Math.floor(hit.point.z) + 0.5;
                     } else {
-                        // 블록 위 또는 측면에 쌓기
                         let obj = hit.object;
                         while(obj.parent && obj.parent !== scene) obj = obj.parent;
                         
                         pos.copy(obj.position);
                         const normal = hit.face.normal;
-                        // 충돌 면의 정규화 벡터 방향으로 1칸 확장
                         pos.x += Math.round(normal.x);
                         pos.y += Math.round(normal.y);
                         pos.z += Math.round(normal.z);
@@ -252,7 +238,7 @@ homework
 
         renderer.domElement.addEventListener('pointerdown', (event) => {
             if (event.pointerType === 'mouse' && event.button !== 0) return;
-            if (event.clientX < 300 && event.clientY < 320) return; // UI 클릭 방지
+            if (event.clientX < 300 && event.clientY < 320) return;
             
             raycaster.setFromCamera(mouse, camera);
 
@@ -284,8 +270,8 @@ homework
                     let resistance = 0.1;
                     if (type === 'led') resistance = 100;
                     if (type === 'battery') resistance = 1;
-                    if (type === 'voltmeter') resistance = 100000; // 전압계는 내부저항 매우 큼
-                    if (type === 'ammeter') resistance = 0.01;    // 전류계는 내부저항 매우 작음
+                    if (type === 'voltmeter') resistance = 100000;
+                    if (type === 'ammeter') resistance = 0.01;
                     
                     const block = { 
                         id: nextBlockId++, type: type, 
@@ -299,7 +285,6 @@ homework
                     scene.add(block.mesh);
                     blocks[key] = block;
                     
-                    // 미리보기 초기화
                     scene.remove(previewMesh);
                     previewMesh = null;
                     
@@ -365,7 +350,6 @@ homework
             setTimeout(() => el.style.display = 'none', 3000);
         }
 
-        /* 입체 3D 공간 회로 분석 및 결합 판단 알고리즘 */
         window.analyzeCircuit = function() {
             const blockList = Object.values(blocks);
             
@@ -380,7 +364,6 @@ homework
             const batteries = blockList.filter(b => b.type === 'battery');
             if (batteries.length === 0) return;
 
-            // 3D 공간 인접 그래프 생성
             const adj = {};
             blockList.forEach(b => adj[b.id] = []);
             
@@ -395,13 +378,9 @@ homework
                     
                     let canConnect = false;
 
-                    // 1. 같은 높이(Y) 수평 결합 (상하좌우)
                     if (dy === 0 && ((dx === 1 && dz === 0) || (dx === 0 && dz === 1))) {
                         canConnect = true;
-                    } 
-                    // 2. 수직 결합 판단 (위/아래 층간 연결)
-                    // 두 블록 중 적어도 하나가 '수직 도선(vwire)'이거나 수직 통로 역할을 해야 전기가 흐름
-                    else if (dx === 0 && dz === 0 && dy === 1) {
+                    } else if (dx === 0 && dz === 0 && dy === 1) {
                         if (b1.type === 'vwire' || b2.type === 'vwire' || b1.type === 'wire' || b2.type === 'wire') {
                             canConnect = true;
                         }
@@ -431,12 +410,10 @@ homework
                 }
 
                 let pathBlocks = blockList.filter(b => visited.has(b.id));
-                let pathConsumers = pathBlocks.filter(b => b.type === 'led' || b.type === 'voltmeter' || b.type === 'ammeter');
                 
-                // 폐회로 조건 간이 계산
                 if (pathBlocks.length > 1) {
                     let totalR = pathBlocks.reduce((sum, b) => sum + b.r, 0);
-                    let circuitI = 9.0 / totalR; // 9V 전원 공급 기준
+                    let circuitI = 9.0 / totalR;
 
                     pathBlocks.forEach(b => {
                         b.i = circuitI;
@@ -494,3 +471,7 @@ homework
     </script>
 </body>
 </html>
+"""
+
+# HTML을 Streamlit component로 출력
+components.html(html_code, height=800, scrolling=False)
